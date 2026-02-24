@@ -10,7 +10,6 @@ const supabase = createClient(
   process.env.SUPABASE_KEY
 );
 
-// Basic cleaner
 function cleanText($) {
   $("script, style, nav, footer, header").remove();
   const text = $("body").text();
@@ -19,28 +18,21 @@ function cleanText($) {
 
 async function scrapePage(url) {
   try {
-    const { data } = await axios.get(url);
-    const $ = cheerio.load(data);
+    const { data } = await axios.get(url, {
+      timeout: 10000,
+      headers: { "User-Agent": "EckoBot/1.0" }
+    });
 
+    const $ = cheerio.load(data);
     const title = $("title").text();
     const rawText = $("body").text();
     const cleanedText = cleanText($);
 
     return { title, rawText, cleanedText };
   } catch (err) {
-    console.error("Error scraping:", url);
+    console.error("Error scraping:", url, err.message);
     return null;
   }
-}
-
-async function storePage(retailerId, url, pageData) {
-  await supabase.from("retailer_pages").insert({
-    retailer_id: retailerId,
-    url,
-    title: pageData.title,
-    raw_text: pageData.rawText,
-    cleaned_text: pageData.cleanedText
-  });
 }
 
 async function createRetailer(name, website) {
@@ -54,14 +46,40 @@ async function createRetailer(name, website) {
   return data.id;
 }
 
-async function run() {
-  const website = "https://example.com"; // toy site
-  const retailerId = await createRetailer("Example Retailer", website);
+async function storePage(retailerId, url, pageData) {
+  const { error } = await supabase
+    .from("retailer_pages")
+    .insert({
+      retailer_id: retailerId,
+      url,
+      title: pageData.title,
+      raw_text: pageData.rawText,
+      cleaned_text: pageData.cleanedText
+    });
 
+  if (error) throw error;
+}
+
+async function run() {
+  const website = process.argv[2];
+
+  if (!website) {
+    console.log("Usage: node scraper.js <website_url>");
+    process.exit(1);
+  }
+
+  console.log("Creating retailer...");
+  const retailerId = await createRetailer("Test Retailer", website);
+
+  console.log("Scraping homepage...");
   const page = await scrapePage(website);
+
   if (page) {
+    console.log("Storing page...");
     await storePage(retailerId, website, page);
-    console.log("Stored successfully");
+    console.log("Done ✅");
+  } else {
+    console.log("Scrape failed ❌");
   }
 }
 
