@@ -1,7 +1,8 @@
 import axios from "axios";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
+import { cleanMarkdown } from "./markdown_cleaner";
 
 dotenv.config();
 
@@ -54,7 +55,7 @@ async function storePage(retailerId, url, pageData) {
       url,
       title: pageData.title,
       raw_text: pageData.rawText,
-      cleaned_text: pageData.cleanedText
+      cleaned_text: cleanMarkdown(pageData.rawText)
     });
 
   if (error) throw error;
